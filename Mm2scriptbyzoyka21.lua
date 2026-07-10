@@ -1,8 +1,17 @@
 --[[
-    MM2 MOBILE SCRIPT - 80+ функций
-    Поддерживает: Arceus X, Hydrogen, Vega X, CodeX, Evon, Fluxus и другие
-    Открыть/Закрыть GUI: КНОПКА (обычно это кнопка меню или объём)
+    MM2 MOBILE SCRIPT - С КНОПКОЙ Z
+    Поддерживает: Arceus X, Hydrogen, Vega X, CodeX, Evon, Fluxus
+    Кнопка Z для открытия/закрытия GUI
 ]]
+
+-- ОТЛАДКА
+print("Скрипт запущен!")
+
+-- ПРОВЕРКА
+if not game or not game:GetService("Players") then
+    warn("Игра не найдена!")
+    return
+end
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,24 +22,150 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local Camera = game.Workspace.CurrentCamera
 
 local Player = Players.LocalPlayer
+
+if not Player then
+    warn("Игрок не найден!")
+    return
+end
+
 local Character = Player.Character or Player.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
 
+print("Игрок загружен: " .. Player.Name)
+
 -- Флаг для отображения GUI
 local guiVisible = false
+local isDragging = false
+local dragStart = nil
+local startPos = nil
+
+-- Удаляем старый GUI если есть
+local oldGui = Player.PlayerGui:FindFirstChild("MM2HackGUI")
+if oldGui then oldGui:Destroy() end
 
 -- Создаём основной GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MM2HackGUI"
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = Player.PlayerGui
+ScreenGui.Enabled = false -- По умолчанию скрыт
 
--- Затемнение фона
+print("GUI создан")
+
+-- ============================================
+-- СОЗДАНИЕ ПЛАВАЮЩЕЙ КНОПКИ Z
+-- ============================================
+
+local FloatingButton = Instance.new("ImageButton")
+FloatingButton.Name = "FloatingButton"
+FloatingButton.Size = UDim2.new(0, 60, 0, 60)
+FloatingButton.Position = UDim2.new(0.5, -30, 0.85, 0)
+FloatingButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+FloatingButton.BackgroundTransparency = 0.2
+FloatingButton.BorderSizePixel = 2
+FloatingButton.BorderColor3 = Color3.fromRGB(255, 255, 255)
+FloatingButton.Image = "rbxassetid://6022647731" -- Иконка шестеренки
+FloatingButton.ImageColor3 = Color3.fromRGB(255, 255, 255)
+FloatingButton.Parent = ScreenGui
+
+-- Текст Z поверх кнопки
+local ButtonText = Instance.new("TextLabel")
+ButtonText.Size = UDim2.new(1, 0, 1, 0)
+ButtonText.BackgroundTransparency = 1
+ButtonText.Text = "Z"
+ButtonText.TextColor3 = Color3.fromRGB(255, 255, 255)
+ButtonText.TextScaled = true
+ButtonText.Font = Enum.Font.GothamBold
+ButtonText.Parent = FloatingButton
+
+-- Анимация свечения
+local glow = Instance.new("ImageLabel")
+glow.Size = UDim2.new(1.5, 0, 1.5, 0)
+glow.Position = UDim2.new(-0.25, 0, -0.25, 0)
+glow.BackgroundTransparency = 1
+glow.Image = "rbxassetid://6022647731"
+glow.ImageColor3 = Color3.fromRGB(255, 100, 100)
+glow.ImageTransparency = 0.7
+glow.Parent = FloatingButton
+
+-- Анимация пульсации
+spawn(function()
+    while true do
+        for i = 0.7, 0.3, -0.01 do
+            glow.ImageTransparency = i
+            wait(0.02)
+        end
+        for i = 0.3, 0.7, 0.01 do
+            glow.ImageTransparency = i
+            wait(0.02)
+        end
+    end
+end)
+
+-- ============================================
+-- ПЕРЕТАСКИВАНИЕ КНОПКИ
+-- ============================================
+
+FloatingButton.MouseButton1Down:Connect(function(x, y)
+    isDragging = true
+    dragStart = Vector2.new(x, y)
+    startPos = FloatingButton.Position
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        if isDragging then
+            local delta = Vector2.new(input.Position.X, input.Position.Y) - dragStart
+            local newX = startPos.X.Scale + (delta.X / game:GetService("GuiService"):GetScreenSize().X)
+            local newY = startPos.Y.Scale + (delta.Y / game:GetService("GuiService"):GetScreenSize().Y)
+            
+            -- Ограничение чтобы не выходила за экран
+            newX = math.clamp(newX, 0, 0.9)
+            newY = math.clamp(newY, 0, 0.9)
+            
+            FloatingButton.Position = UDim2.new(newX, 0, newY, 0)
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        isDragging = false
+    end
+end)
+
+-- ============================================
+-- ОТКРЫТИЕ/ЗАКРЫТИЕ МЕНЮ ПО КНОПКЕ
+-- ============================================
+
+FloatingButton.MouseButton1Click:Connect(function()
+    -- Проверяем что это не перетаскивание
+    if not isDragging then
+        guiVisible = not guiVisible
+        ScreenGui.Enabled = guiVisible
+        
+        -- Анимация кнопки при нажатии
+        TweenService:Create(FloatingButton, TweenInfo.new(0.1), {
+            Size = UDim2.new(0, 55, 0, 55)
+        }):Play()
+        wait(0.1)
+        TweenService:Create(FloatingButton, TweenInfo.new(0.1), {
+            Size = UDim2.new(0, 60, 0, 60)
+        }):Play()
+        
+        print("GUI " .. (guiVisible and "открыт" or "закрыт (фоновый режим)"))
+    end
+end)
+
+-- ============================================
+-- ОСНОВНОЕ МЕНЮ
+-- ============================================
+
 local Background = Instance.new("Frame")
-Background.Size = UDim2.new(0.9, 0, 0.85, 0)
-Background.Position = UDim2.new(0.05, 0, 0.075, 0)
+Background.Size = UDim2.new(0, 400, 0, 600)
+Background.Position = UDim2.new(0.5, -200, 0.5, -300)
 Background.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-Background.BackgroundTransparency = 0.15
+Background.BackgroundTransparency = 0.1
 Background.BorderSizePixel = 0
 Background.ClipsDescendants = true
 Background.Active = true
@@ -39,7 +174,7 @@ Background.Parent = ScreenGui
 
 -- Заголовок
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0.08, 0)
+Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
 Title.BackgroundTransparency = 0.3
 Title.Text = "MM2 HUB v3.0"
@@ -48,23 +183,26 @@ Title.TextScaled = true
 Title.Font = Enum.Font.GothamBold
 Title.Parent = Background
 
--- Кнопка закрытия
-local CloseBtn = Instance.new("ImageButton")
-CloseBtn.Size = UDim2.new(0.07, 0, 0.07, 0)
-CloseBtn.Position = UDim2.new(0.93, 0, 0.01, 0)
+-- Кнопка закрытия в меню
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -35, 0, 5)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-CloseBtn.BackgroundTransparency = 0.3
-CloseBtn.Image = "rbxassetid://6022647731"
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextScaled = true
+CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.Parent = Background
 CloseBtn.MouseButton1Click:Connect(function()
     guiVisible = false
     ScreenGui.Enabled = false
+    print("GUI закрыт (фоновый режим)")
 end)
 
 -- Скроллинг контейнер
 local ScrollingFrame = Instance.new("ScrollingFrame")
-ScrollingFrame.Size = UDim2.new(1, 0, 0.9, 0)
-ScrollingFrame.Position = UDim2.new(0, 0, 0.08, 0)
+ScrollingFrame.Size = UDim2.new(1, -10, 1, -50)
+ScrollingFrame.Position = UDim2.new(0, 5, 0, 45)
 ScrollingFrame.BackgroundTransparency = 1
 ScrollingFrame.BorderSizePixel = 0
 ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -74,8 +212,8 @@ ScrollingFrame.Parent = Background
 
 local function CreateCategory(title, yPos)
     local Cat = Instance.new("TextLabel")
-    Cat.Size = UDim2.new(0.95, 0, 0.05, 0)
-    Cat.Position = UDim2.new(0.025, 0, yPos, 0)
+    Cat.Size = UDim2.new(0.95, 0, 0, 30)
+    Cat.Position = UDim2.new(0.025, 0, 0, yPos)
     Cat.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
     Cat.Text = title
     Cat.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -87,22 +225,24 @@ end
 
 local function CreateButton(text, yPos, callback)
     local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(0.45, 0, 0.07, 0)
-    Btn.Position = UDim2.new(0.025, 0, yPos, 0)
+    Btn.Size = UDim2.new(0.45, 0, 0, 35)
+    Btn.Position = UDim2.new(0.025, 0, 0, yPos)
     Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
     Btn.Text = text
     Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     Btn.TextScaled = true
     Btn.Font = Enum.Font.Gotham
     Btn.Parent = ScrollingFrame
-    Btn.MouseButton1Click:Connect(callback)
+    Btn.MouseButton1Click:Connect(function()
+        pcall(callback)
+    end)
     return Btn
 end
 
 local function CreateToggle(text, yPos, callback)
     local Tog = Instance.new("TextButton")
-    Tog.Size = UDim2.new(0.45, 0, 0.07, 0)
-    Tog.Position = UDim2.new(0.025, 0, yPos, 0)
+    Tog.Size = UDim2.new(0.45, 0, 0, 35)
+    Tog.Position = UDim2.new(0.025, 0, 0, yPos)
     Tog.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
     Tog.Text = text .. " ❌"
     Tog.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -113,81 +253,107 @@ local function CreateToggle(text, yPos, callback)
     Tog.MouseButton1Click:Connect(function()
         state = not state
         Tog.Text = text .. (state and " ✅" or " ❌")
-        callback(state)
+        pcall(callback, state)
     end)
     return Tog
 end
 
 -- Подсчёт высоты
-local currentY = 0.02
+local currentY = 5
+
+-- Помощник для поиска ремоутов
+local function GetRemote(remoteName)
+    local remote = ReplicatedStorage:FindFirstChild(remoteName)
+    if not remote then
+        remote = ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild(remoteName)
+    end
+    return remote
+end
 
 -- ===================== ФУНКЦИИ (80+) =====================
 
 -- 1. Combat
 CreateCategory("⚔️ БОЕВЫЕ", currentY)
-currentY = currentY + 0.055
+currentY = currentY + 35
 
 CreateButton("Ударить всех", currentY, function()
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= Player and v.Character and v.Character:FindFirstChild("Humanoid") then
-            game.ReplicatedStorage.Remotes.SwordHit:FireServer(v.Character.HumanoidRootPart)
+    local remote = GetRemote("SwordHit")
+    if remote then
+        for _, v in pairs(Players:GetPlayers()) do
+            if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+                remote:FireServer(v.Character.HumanoidRootPart)
+            end
         end
     end
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
 CreateButton("Убить игрока", currentY, function()
-    local target = Players:GetPlayers()[2]
-    if target and target.Character then
-        game.ReplicatedStorage.Remotes.SwordHit:FireServer(target.Character.HumanoidRootPart)
+    local remote = GetRemote("SwordHit")
+    if remote then
+        local target = Players:GetPlayers()[2]
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            remote:FireServer(target.Character.HumanoidRootPart)
+        end
     end
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
 CreateToggle("Авто-атака", currentY, function(state)
     if state then
-        RunService.Heartbeat:Connect(function()
-            for _, v in pairs(Players:GetPlayers()) do
-                if v ~= Player and v.Character then
-                    game.ReplicatedStorage.Remotes.SwordHit:FireServer(v.Character.HumanoidRootPart)
+        local remote = GetRemote("SwordHit")
+        if remote then
+            RunService.Heartbeat:Connect(function()
+                for _, v in pairs(Players:GetPlayers()) do
+                    if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+                        remote:FireServer(v.Character.HumanoidRootPart)
+                    end
                 end
-            end
-        end)
+            end)
+        end
     end
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
 CreateToggle("Бессмертие", currentY, function(state)
     if Character and Humanoid then
         Humanoid.MaxHealth = state and math.huge or 100
+        Humanoid.Health = state and math.huge or 100
     end
 end)
-currentY = currentY + 0.08
+currentY = currentY + 45
 
 -- 2. Movement
 CreateCategory("🏃 ДВИЖЕНИЕ", currentY)
-currentY = currentY + 0.055
+currentY = currentY + 35
 
-CreateToggle("Скорость бега x2", currentY, function(state)
+CreateToggle("Скорость x2", currentY, function(state)
     if Character and Humanoid then
         Humanoid.WalkSpeed = state and 32 or 16
     end
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
-CreateToggle("Скорость бега x5", currentY, function(state)
+CreateToggle("Скорость x5", currentY, function(state)
     if Character and Humanoid then
         Humanoid.WalkSpeed = state and 80 or 16
     end
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
 CreateToggle("Прыжок x2", currentY, function(state)
     if Character and Humanoid then
         Humanoid.JumpPower = state and 100 or 50
     end
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
+
+CreateToggle("Супер прыжок", currentY, function(state)
+    if Character and Humanoid then
+        Humanoid.JumpPower = state and 200 or 50
+    end
+end)
+currentY = currentY + 40
 
 CreateToggle("Полёт (Space)", currentY, function(state)
     if state then
@@ -201,13 +367,13 @@ CreateToggle("Полёт (Space)", currentY, function(state)
         Humanoid.PlatformStand = false
     end
 end)
-currentY = currentY + 0.08
+currentY = currentY + 45
 
 -- 3. ESP
 CreateCategory("👁️ ESP", currentY)
-currentY = currentY + 0.055
+currentY = currentY + 35
 
-CreateToggle("ESP всех игроков", currentY, function(state)
+CreateToggle("ESP игроков", currentY, function(state)
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= Player and v.Character then
             local box = Instance.new("BoxHandleAdornment")
@@ -220,7 +386,7 @@ CreateToggle("ESP всех игроков", currentY, function(state)
         end
     end
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
 CreateToggle("ESP оружия", currentY, function(state)
     for _, v in pairs(game.Workspace:GetChildren()) do
@@ -234,109 +400,99 @@ CreateToggle("ESP оружия", currentY, function(state)
         end
     end
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
-CreateToggle("ESP Мафии", currentY, function(state)
+CreateToggle("ESP монет", currentY, function(state)
     for _, v in pairs(game.Workspace:GetChildren()) do
-        if v:IsA("Model") and v.Name == "Mafioso" then
+        if v:IsA("Part") and v.Name == "Coin" then
             local box = Instance.new("BoxHandleAdornment")
-            box.Size = Vector3.new(3, 4, 1)
-            box.Color3 = Color3.fromRGB(255, 255, 0)
+            box.Size = Vector3.new(1, 1, 1)
+            box.Color3 = Color3.fromRGB(255, 215, 0)
             box.AlwaysOnTop = true
             box.Adornee = v
             box.Parent = state and v or nil
         end
     end
 end)
-currentY = currentY + 0.08
+currentY = currentY + 45
 
--- 4. Visual
-CreateCategory("🎨 ВИЗУАЛ", currentY)
-currentY = currentY + 0.055
-
-CreateToggle("Wallhack (прозрачные стены)", currentY, function(state)
-    for _, v in pairs(game.Workspace:GetDescendants()) do
-        if v:IsA("BasePart") and not v.Parent:FindFirstChild("Humanoid") then
-            v.LocalTransparencyModifier = state and 0.3 or 0
-        end
-    end
-end)
-currentY = currentY + 0.075
-
-CreateToggle("Подсветка игроков", currentY, function(state)
-    for _, v in pairs(Players:GetPlayers()) do
-        if v.Character then
-            for _, part in pairs(v.Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.Material = state and Enum.Material.Neon or Enum.Material.SmoothPlastic
-                end
-            end
-        end
-    end
-end)
-currentY = currentY + 0.075
-
-CreateToggle("Смена дня/ночи", currentY, function(state)
-    game.Lighting.Brightness = state and 10 or 2
-    game.Lighting.ClockTime = state and 14 or 6
-end)
-currentY = currentY + 0.08
-
--- 5. Auto Farm
+-- 4. Auto Farm
 CreateCategory("🤖 АВТО-ФАРМ", currentY)
-currentY = currentY + 0.055
+currentY = currentY + 35
 
 CreateToggle("Авто-сбор монет", currentY, function(state)
-    while state do
-        for _, v in pairs(game.Workspace:GetChildren()) do
-            if v:IsA("Part") and v.Name == "Coin" then
-                game.ReplicatedStorage.Remotes.CollectCoin:FireServer(v)
+    spawn(function()
+        while state do
+            local remote = GetRemote("CollectCoin")
+            if remote then
+                for _, v in pairs(game.Workspace:GetChildren()) do
+                    if v:IsA("Part") and v.Name == "Coin" then
+                        remote:FireServer(v)
+                    end
+                end
             end
+            wait(0.5)
         end
-        wait(0.5)
-    end
+    end)
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
-CreateToggle("Авто-сбор боеприпасов", currentY, function(state)
-    while state do
-        for _, v in pairs(game.Workspace:GetChildren()) do
-            if v:IsA("Part") and v.Name == "Ammo" then
-                game.ReplicatedStorage.Remotes.CollectAmmo:FireServer(v)
+CreateToggle("Авто-сбор патронов", currentY, function(state)
+    spawn(function()
+        while state do
+            local remote = GetRemote("CollectAmmo")
+            if remote then
+                for _, v in pairs(game.Workspace:GetChildren()) do
+                    if v:IsA("Part") and v.Name == "Ammo" then
+                        remote:FireServer(v)
+                    end
+                end
             end
+            wait(0.5)
         end
-        wait(0.5)
-    end
+    end)
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
 CreateButton("Фарм опыта (мафия)", currentY, function()
-    for i = 1, 100 do
-        game.ReplicatedStorage.Remotes.GiveMafiaExp:FireServer(1000)
-        wait(0.1)
+    local remote = GetRemote("GiveMafiaExp")
+    if remote then
+        for i = 1, 100 do
+            remote:FireServer(1000)
+            wait(0.1)
+        end
     end
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
 CreateToggle("Авто-перезарядка", currentY, function(state)
     if state then
-        RunService.Heartbeat:Connect(function()
-            game.ReplicatedStorage.Remotes.ReloadGun:FireServer()
-        end)
+        local remote = GetRemote("ReloadGun")
+        if remote then
+            RunService.Heartbeat:Connect(function()
+                remote:FireServer()
+            end)
+        end
     end
 end)
-currentY = currentY + 0.08
+currentY = currentY + 45
 
--- 6. Weapons
+-- 5. Weapons
 CreateCategory("🔫 ОРУЖИЕ", currentY)
-currentY = currentY + 0.055
+currentY = currentY + 35
 
 CreateButton("Дать все оружия", currentY, function()
-    for _, tool in pairs(game.ReplicatedStorage.Weapons:GetChildren()) do
-        tool:Clone().Parent = Player.Backpack
+    local weapons = ReplicatedStorage:FindFirstChild("Weapons")
+    if weapons then
+        for _, tool in pairs(weapons:GetChildren()) do
+            if tool:IsA("Tool") then
+                local clone = tool:Clone()
+                clone.Parent = Player.Backpack
+            end
+        end
     end
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
 CreateToggle("Бесконечные патроны", currentY, function(state)
     if state then
@@ -349,70 +505,70 @@ CreateToggle("Бесконечные патроны", currentY, function(state)
         end)
     end
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
 CreateToggle("Авто-прицел", currentY, function(state)
     if state then
         RunService.Heartbeat:Connect(function()
             local target = Players:GetPlayers()[2]
-            if target and target.Character then
+            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
             end
         end)
-    else
-        Camera.CFrame = CFrame.new()
     end
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
 CreateToggle("Увеличенный урон", currentY, function(state)
-    if state then
-        game.ReplicatedStorage.Remotes.Damage:FireServer(100)
+    local remote = GetRemote("Damage")
+    if remote then
+        remote:FireServer(state and 100 or 10)
     end
 end)
-currentY = currentY + 0.08
+currentY = currentY + 45
 
--- 7. Server
+-- 6. Server
 CreateCategory("🌐 СЕРВЕР", currentY)
-currentY = currentY + 0.055
+currentY = currentY + 35
+
+CreateButton("Телепорт к игроку", currentY, function()
+    local target = Players:GetPlayers()[2]
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame
+    end
+end)
+currentY = currentY + 40
+
+CreateButton("Телепорт ко всем", currentY, function()
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            Character.HumanoidRootPart.CFrame = v.Character.HumanoidRootPart.CFrame
+            wait(0.1)
+        end
+    end
+end)
+currentY = currentY + 40
+
+CreateToggle("Анти-афк", currentY, function(state)
+    if state then
+        local remote = GetRemote("AntiAFK")
+        if remote then
+            RunService.Heartbeat:Connect(function()
+                remote:FireServer()
+            end)
+        end
+    end
+end)
+currentY = currentY + 40
 
 CreateButton("Рестарт сервера", currentY, function()
     game:Shutdown()
 end)
-currentY = currentY + 0.075
+currentY = currentY + 45
 
-CreateButton("Телепорт ко всем", currentY, function()
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= Player and v.Character then
-            Character.HumanoidRootPart.CFrame = v.Character.HumanoidRootPart.CFrame
-        end
-    end
-end)
-currentY = currentY + 0.075
-
-CreateToggle("Анти-афк", currentY, function(state)
-    if state then
-        RunService.Heartbeat:Connect(function()
-            game.ReplicatedStorage.Remotes.AntiAFK:FireServer()
-        end)
-    end
-end)
-currentY = currentY + 0.075
-
-CreateToggle("Отключить всех", currentY, function(state)
-    if state then
-        for _, v in pairs(Players:GetPlayers()) do
-            if v ~= Player then
-                v:Kick("Отключено хостом")
-            end
-        end
-    end
-end)
-currentY = currentY + 0.08
-
--- 8. Other
+-- 7. Other
 CreateCategory("🛠️ РАЗНОЕ", currentY)
-currentY = currentY + 0.055
+currentY = currentY + 35
 
 CreateToggle("Noclip", currentY, function(state)
     if Character then
@@ -423,118 +579,87 @@ CreateToggle("Noclip", currentY, function(state)
         end
     end
 end)
-currentY = currentY + 0.075
-
-CreateButton("Очистить чат", currentY, function()
-    for i = 1, 50 do
-        Player.PlayerGui.Chat.Frame.ChatChannelParentFrame.Visible = false
-        wait(0.1)
-        Player.PlayerGui.Chat.Frame.ChatChannelParentFrame.Visible = true
-    end
-end)
-currentY = currentY + 0.075
-
-CreateButton("Спам в чат", currentY, function()
-    for i = 1, 20 do
-        game.ReplicatedStorage.Remotes.Chat:FireServer("Hack by MM2")
-        wait(0.2)
-    end
-end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
 CreateToggle("Гравитация 0", currentY, function(state)
     game.Workspace.Gravity = state and 0 or 196.2
 end)
-currentY = currentY + 0.075
+currentY = currentY + 40
 
 CreateToggle("Магнит к игрокам", currentY, function(state)
     if state then
         RunService.Heartbeat:Connect(function()
             for _, v in pairs(Players:GetPlayers()) do
-                if v ~= Player and v.Character then
+                if v ~= Player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
                     Character.HumanoidRootPart.CFrame = v.Character.HumanoidRootPart.CFrame
                 end
             end
         end)
     end
 end)
-currentY = currentY + 0.08
+currentY = currentY + 40
 
--- Дополнительные функции до 80+
+CreateButton("Спавн монет", currentY, function()
+    local remote = GetRemote("SpawnCoin")
+    if remote then
+        for i = 1, 50 do
+            remote:FireServer()
+            wait(0.05)
+        end
+    end
+end)
+currentY = currentY + 40
 
-local extraFuncs = {
-    {"Телепорт в центр", function()
-        Character.HumanoidRootPart.CFrame = CFrame.new(0, 50, 0)
-    end},
-    {"Удалить оружие у всех", function()
+CreateButton("Очистить чат", currentY, function()
+    local chat = Player.PlayerGui:FindFirstChild("Chat")
+    if chat then
+        for i = 1, 50 do
+            chat.Frame.ChatChannelParentFrame.Visible = false
+            wait(0.05)
+            chat.Frame.ChatChannelParentFrame.Visible = true
+        end
+    end
+end)
+currentY = currentY + 40
+
+CreateButton("Спам в чат", currentY, function()
+    local remote = GetRemote("Chat")
+    if remote then
+        for i = 1, 20 do
+            remote:FireServer("Hack by MM2")
+            wait(0.2)
+        end
+    end
+end)
+currentY = currentY + 40
+
+CreateToggle("Отключить всех", currentY, function(state)
+    if state then
         for _, v in pairs(Players:GetPlayers()) do
-            if v.Character then
-                for _, tool in pairs(v.Character:GetChildren()) do
-                    if tool:IsA("Tool") then tool:Destroy() end
-                end
+            if v ~= Player then
+                v:Kick("Отключено хостом")
             end
         end
-    end},
-    {"Бесконечный ульт", function()
-        game.ReplicatedStorage.Remotes.UseUlt:FireServer()
-    end},
-    {"Изменить ник", function()
-        Player.Name = "HACKED"
-    end},
-    {"Спавн монет", function()
-        for i = 1, 50 do
-            game.ReplicatedStorage.Remotes.SpawnCoin:FireServer()
-        end
-    end},
-    {"Клонировать игрока", function()
-        local clone = Character:Clone()
-        clone.Parent = game.Workspace
-        clone.HumanoidRootPart.CFrame = Character.HumanoidRootPart.CFrame + Vector3.new(5, 0, 0)
-    end},
-    {"Ускорить сервер", function()
-        game:SetSimulationRadius(1000)
-    end},
-    {"Взять скин", function()
-        for _, skin in pairs(game.ReplicatedStorage.Skins:GetChildren()) do
-            game.ReplicatedStorage.Remotes.SelectSkin:FireServer(skin.Name)
-        end
-    end},
-    {"Авто-победа", function()
-        game.ReplicatedStorage.Remotes.WinRound:FireServer()
-    end},
-    {"Отключить звук", function()
-        game.SoundService.Volume = 0
-    end},
-}
-
-for i, data in ipairs(extraFuncs) do
-    CreateButton(data[1], currentY, data[2])
-    currentY = currentY + 0.075
-end
+    end
+end)
+currentY = currentY + 45
 
 -- Обновляем CanvasSize
-ScrollingFrame.CanvasSize = UDim2.new(0, 0, currentY * 1000, 0)
+ScrollingFrame.CanvasSize = UDim2.new(0, 0, currentY + 50, 0)
 
--- Открытие/закрытие по кнопке (обычно Menu, Volume, или R2 на контроллере)
+print("GUI загружен! Всего функций: " .. #ScrollingFrame:GetChildren())
+
+-- Дополнительные горячие клавиши для удобства
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
+    -- Клавиша Z на клавиатуре тоже открывает
+    if input.KeyCode == Enum.KeyCode.Z then
         guiVisible = not guiVisible
         ScreenGui.Enabled = guiVisible
+        print("GUI " .. (guiVisible and "открыт" or "закрыт (фоновый режим)"))
     end
 end)
 
--- Для мобильных: нажатие на кнопку увеличения громкости или меню (если поддерживается)
-if UserInputService.TouchEnabled then
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.KeyCode == Enum.KeyCode.Menu then
-            guiVisible = not guiVisible
-            ScreenGui.Enabled = guiVisible
-        end
-    end)
-end
-
--- Анимация появления
-ScreenGui.Enabled = false
-print("MM2 HUB загружен! Нажмите CTRL или MENU для открытия.")
+print("Скрипт полностью загружен!")
+print("Нажмите на кнопку Z для открытия/закрытия меню")
+print("Кнопку можно перетаскивать!")
